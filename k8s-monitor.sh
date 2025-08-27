@@ -115,7 +115,7 @@ monitor_replicasets() {
             echo -e "${CYAN}$name${NC}\t$(format_number "$desired" "")\t$(format_number "$current" "")\t$(format_number "$ready" "")\t${PURPLE}$age${NC}"
         done
     else
-        replicasets=$(kubectl get replicasets -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" || echo "")
+        replicasets=$(kubectl get replicasets -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[^-]*-" || echo "")
         if [ -n "$replicasets" ]; then
             echo -e "${WHITE}NAME${NC}\t\t\t${WHITE}DESIRED${NC}\t${WHITE}CURRENT${NC}\t${WHITE}READY${NC}\t${WHITE}AGE${NC}"
             echo "$replicasets" | while read -r name desired current ready age; do
@@ -136,7 +136,7 @@ monitor_pods() {
             echo -e "${CYAN}$name${NC}\t$(format_status "$status")\t$(format_number "$restarts" "restarts")\t\t${PURPLE}$age${NC}\t${BLUE}$node${NC}"
         done
     else
-        pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" || echo "")
+        pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]" || echo "")
         if [ -n "$pods" ]; then
             echo -e "${WHITE}NAME${NC}\t\t\t${WHITE}STATUS${NC}\t\t${WHITE}RESTARTS${NC}\t${WHITE}AGE${NC}\t${WHITE}NODE${NC}"
             echo "$pods" | while read -r name ready status restarts age ip node nominated readiness; do
@@ -157,7 +157,7 @@ monitor_services() {
             echo -e "${CYAN}$name${NC}\t\t${YELLOW}$type${NC}\t\t${BLUE}$cluster_ip${NC}\t${GREEN}$external_ip${NC}\t\t${PURPLE}$ports${NC}\t$age"
         done
     else
-        services=$(kubectl get services -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME" || echo "")
+        services=$(kubectl get services -n "$NAMESPACE" --no-headers 2>/dev/null | awk -v app="$APP_NAME" '$1 == app {print}' || echo "")
         if [ -n "$services" ]; then
             echo -e "${WHITE}NAME${NC}\t\t${WHITE}TYPE${NC}\t\t${WHITE}CLUSTER-IP${NC}\t${WHITE}EXTERNAL-IP${NC}\t${WHITE}PORT(S)${NC}\t\t${WHITE}AGE${NC}"
             echo "$services" | while read -r name type cluster_ip external_ip ports age; do
@@ -182,7 +182,7 @@ monitor_pod_health() {
             echo -e "${CYAN}$pod${NC}\t$(format_status "$phase")\t$(format_status "$ready")\t$(format_number "$restarts" "restarts")"
         done
     else
-        pod_names=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | awk '{print $1}' || echo "")
+        pod_names=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]" | awk '{print $1}' || echo "")
         if [ -n "$pod_names" ]; then
             echo -e "${WHITE}POD NAME${NC}\t\t\t${WHITE}PHASE${NC}\t\t${WHITE}READY${NC}\t${WHITE}RESTARTS${NC}"
             for pod in $pod_names; do
@@ -201,7 +201,7 @@ monitor_pod_health() {
 monitor_events() {
     print_subheader "RECENT EVENTS" "📋"
     local events
-    events=$(kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null | grep "$APP_NAME" | tail -n 5 | head -n 5 || echo "")
+    events=$(kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null | grep "$APP_NAME" | grep -v "$APP_NAME-[a-z]" | tail -n 5 | head -n 5 || echo "")
     if [ -n "$events" ]; then
         echo -e "${WHITE}LAST SEEN${NC}\t${WHITE}TYPE${NC}\t\t${WHITE}REASON${NC}\t\t${WHITE}OBJECT${NC}\t\t${WHITE}MESSAGE${NC}"
         echo "$events" | while IFS= read -r line; do
@@ -235,7 +235,7 @@ monitor_pod_logs() {
             fi
         done
     else
-        pod_names=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | awk '{print $1}' || echo "")
+        pod_names=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]" | awk '{print $1}' || echo "")
         if [ -n "$pod_names" ]; then
             for pod in $pod_names; do
                 echo
@@ -260,7 +260,7 @@ monitor_ingress() {
     if kubectl get ingress -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null | grep -q .; then
         kubectl get ingress -n "$NAMESPACE" -l app="$APP_NAME" -o wide
     else
-        kubectl get ingress -n "$NAMESPACE" | grep "$APP_NAME" || echo "No ingress found for app: $APP_NAME"
+        kubectl get ingress -n "$NAMESPACE" | awk -v app="$APP_NAME" '$1 == app {print}' || echo "No ingress found for app: $APP_NAME"
     fi
 }
 
@@ -270,7 +270,7 @@ monitor_configmaps_secrets() {
     if kubectl get configmaps -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null | grep -q .; then
         kubectl get configmaps -n "$NAMESPACE" -l app="$APP_NAME"
     else
-        kubectl get configmaps -n "$NAMESPACE" | grep "$APP_NAME" || echo "No configmaps found for app: $APP_NAME"
+        kubectl get configmaps -n "$NAMESPACE" | awk -v app="$APP_NAME" '$1 == app {print}' || echo "No configmaps found for app: $APP_NAME"
     fi
     
     echo
@@ -278,14 +278,14 @@ monitor_configmaps_secrets() {
     if kubectl get secrets -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null | grep -q .; then
         kubectl get secrets -n "$NAMESPACE" -l app="$APP_NAME"
     else
-        kubectl get secrets -n "$NAMESPACE" | grep "$APP_NAME" || echo "No secrets found for app: $APP_NAME"
+        kubectl get secrets -n "$NAMESPACE" | awk -v app="$APP_NAME" '$1 == app {print}' || echo "No secrets found for app: $APP_NAME"
     fi
 }
 
 monitor_resource_usage() {
     print_subheader "RESOURCE USAGE"
     echo "Pod Resource Usage:"
-    if kubectl top pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "$APP_NAME"; then
+    if kubectl top pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]"; then
         echo "Resource metrics available"
     else
         echo "Resource metrics not available (metrics-server may not be installed)"
