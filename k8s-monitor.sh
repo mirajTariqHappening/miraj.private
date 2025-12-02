@@ -125,11 +125,36 @@ monitor_deployments() {
     
     for APP_NAME in "${APP_NAMES[@]}"; do
         local deployments
+        # Try with app label first
         if deployments=$(kubectl get deployments -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$deployments" ]; then
             found_any=true
             echo "$deployments" | while read -r name ready uptodate available age; do
                 echo -e "${CYAN}$name${NC}\t\t$(format_status "$ready")\t$(format_number "$uptodate" "")\t\t$(format_status "$available")\t\t${PURPLE}$age${NC}\t\t${YELLOW}$APP_NAME${NC}"
             done
+        # Try with specific component labels for known apps
+        elif [[ "$APP_NAME" == "mlflow" ]]; then
+            deployments=$(kubectl get deployments -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=server --no-headers 2>/dev/null)
+            if [ -n "$deployments" ]; then
+                found_any=true
+                echo "$deployments" | while read -r name ready uptodate available age; do
+                    echo -e "${CYAN}$name${NC}\t\t$(format_status "$ready")\t$(format_number "$uptodate" "")\t\t$(format_status "$available")\t\t${PURPLE}$age${NC}\t\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        elif [[ "$APP_NAME" == "mlflow-webhook" ]]; then
+            deployments=$(kubectl get deployments -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=webhook-handler --no-headers 2>/dev/null)
+            if [ -n "$deployments" ]; then
+                found_any=true
+                echo "$deployments" | while read -r name ready uptodate available age; do
+                    echo -e "${CYAN}$name${NC}\t\t$(format_status "$ready")\t$(format_number "$uptodate" "")\t\t$(format_status "$available")\t\t${PURPLE}$age${NC}\t\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        # Try with app.kubernetes.io/name label
+        elif deployments=$(kubectl get deployments -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$deployments" ]; then
+            found_any=true
+            echo "$deployments" | while read -r name ready uptodate available age; do
+                echo -e "${CYAN}$name${NC}\t\t$(format_status "$ready")\t$(format_number "$uptodate" "")\t\t$(format_status "$available")\t\t${PURPLE}$age${NC}\t\t${YELLOW}$APP_NAME${NC}"
+            done
+        # Fallback to name matching
         else
             deployments=$(kubectl get deployments -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME " || echo "")
             if [ -n "$deployments" ]; then
@@ -153,11 +178,19 @@ monitor_replicasets() {
     
     for APP_NAME in "${APP_NAMES[@]}"; do
         local replicasets
+        # Try with app label first
         if replicasets=$(kubectl get replicasets -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$replicasets" ]; then
             found_any=true
             echo "$replicasets" | while read -r name desired current ready age; do
                 echo -e "${CYAN}$name${NC}\t$(format_number "$desired" "")\t$(format_number "$current" "")\t$(format_number "$ready" "")\t${PURPLE}$age${NC}\t${YELLOW}$APP_NAME${NC}"
             done
+        # Try with app.kubernetes.io/name label
+        elif replicasets=$(kubectl get replicasets -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$replicasets" ]; then
+            found_any=true
+            echo "$replicasets" | while read -r name desired current ready age; do
+                echo -e "${CYAN}$name${NC}\t$(format_number "$desired" "")\t$(format_number "$current" "")\t$(format_number "$ready" "")\t${PURPLE}$age${NC}\t${YELLOW}$APP_NAME${NC}"
+            done
+        # Fallback to name matching
         else
             replicasets=$(kubectl get replicasets -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[^-]*-" || echo "")
             if [ -n "$replicasets" ]; then
@@ -181,11 +214,36 @@ monitor_pods() {
     
     for APP_NAME in "${APP_NAMES[@]}"; do
         local pods
+        # Try with app label first
         if pods=$(kubectl get pods -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$pods" ]; then
             found_any=true
             kubectl get pods -n "$NAMESPACE" -l app="$APP_NAME" --no-headers -o wide | while read -r name ready status restarts age ip node nominated readiness; do
                 echo -e "${CYAN}$name${NC}\t$(format_status "$status")\t$(format_number "$restarts" "restarts")\t\t${PURPLE}$age${NC}\t${BLUE}$node${NC}\t${YELLOW}$APP_NAME${NC}"
             done
+        # Try with specific component labels for known apps
+        elif [[ "$APP_NAME" == "mlflow" ]]; then
+            pods=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=server --no-headers 2>/dev/null)
+            if [ -n "$pods" ]; then
+                found_any=true
+                kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=server --no-headers -o wide | while read -r name ready status restarts age ip node nominated readiness; do
+                    echo -e "${CYAN}$name${NC}\t$(format_status "$status")\t$(format_number "$restarts" "restarts")\t\t${PURPLE}$age${NC}\t${BLUE}$node${NC}\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        elif [[ "$APP_NAME" == "mlflow-webhook" ]]; then
+            pods=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=webhook-handler --no-headers 2>/dev/null)
+            if [ -n "$pods" ]; then
+                found_any=true
+                kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=webhook-handler --no-headers -o wide | while read -r name ready status restarts age ip node nominated readiness; do
+                    echo -e "${CYAN}$name${NC}\t$(format_status "$status")\t$(format_number "$restarts" "restarts")\t\t${PURPLE}$age${NC}\t${BLUE}$node${NC}\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        # Try with app.kubernetes.io/name label
+        elif pods=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$pods" ]; then
+            found_any=true
+            kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" --no-headers -o wide | while read -r name ready status restarts age ip node nominated readiness; do
+                echo -e "${CYAN}$name${NC}\t$(format_status "$status")\t$(format_number "$restarts" "restarts")\t\t${PURPLE}$age${NC}\t${BLUE}$node${NC}\t${YELLOW}$APP_NAME${NC}"
+            done
+        # Fallback to name matching
         else
             pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]" || echo "")
             if [ -n "$pods" ]; then
@@ -209,12 +267,51 @@ monitor_services() {
     
     for APP_NAME in "${APP_NAMES[@]}"; do
         local services
+        local services_found=false
+        
+        # Try with app label first
         if services=$(kubectl get services -n "$NAMESPACE" -l app="$APP_NAME" --no-headers 2>/dev/null) && [ -n "$services" ]; then
             found_any=true
+            services_found=true
             echo "$services" | while read -r name type cluster_ip external_ip ports age; do
                 echo -e "${CYAN}$name${NC}\t\t${YELLOW}$type${NC}\t\t${BLUE}$cluster_ip${NC}\t${GREEN}$external_ip${NC}\t\t${PURPLE}$ports${NC}\t$age\t${YELLOW}$APP_NAME${NC}"
             done
-        else
+        fi
+        
+        # Handle specific cases for mlflow components to avoid duplicates
+        if [[ "$services_found" == false ]]; then
+            if [[ "$APP_NAME" == "mlflow" ]]; then
+                # For mlflow, try component=server first, then broader search excluding webhook
+                services=$(kubectl get services -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=server --no-headers 2>/dev/null)
+                if [ -z "$services" ]; then
+                    # If no component=server, get mlflow services but exclude webhook-handler component
+                    services=$(kubectl get services -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow --no-headers 2>/dev/null | while read -r line; do
+                        service_name=$(echo "$line" | awk '{print $1}')
+                        component=$(kubectl get service "$service_name" -n "$NAMESPACE" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/component}' 2>/dev/null || echo "")
+                        if [[ "$component" != "webhook-handler" ]]; then
+                            echo "$line"
+                        fi
+                    done)
+                fi
+            elif [[ "$APP_NAME" == "mlflow-webhook" ]]; then
+                # For mlflow-webhook, specifically look for webhook-handler component
+                services=$(kubectl get services -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=webhook-handler --no-headers 2>/dev/null)
+            else
+                # For other apps, try app.kubernetes.io/name label
+                services=$(kubectl get services -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" --no-headers 2>/dev/null)
+            fi
+            
+            if [ -n "$services" ]; then
+                found_any=true
+                services_found=true
+                echo "$services" | while read -r name type cluster_ip external_ip ports age; do
+                    echo -e "${CYAN}$name${NC}\t\t${YELLOW}$type${NC}\t\t${BLUE}$cluster_ip${NC}\t${GREEN}$external_ip${NC}\t\t${PURPLE}$ports${NC}\t$age\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        fi
+        
+        # Fallback to name matching if nothing found yet
+        if [[ "$services_found" == false ]]; then
             services=$(kubectl get services -n "$NAMESPACE" --no-headers 2>/dev/null | awk -v app="$APP_NAME" '$1 == app {print}' || echo "")
             if [ -n "$services" ]; then
                 found_any=true
@@ -237,6 +334,7 @@ monitor_pod_health() {
     
     for APP_NAME in "${APP_NAMES[@]}"; do
         local pod_names
+        # Try with app label first
         if pod_names=$(kubectl get pods -n "$NAMESPACE" -l app="$APP_NAME" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null) && [ -n "$pod_names" ]; then
             found_any=true
             for pod in $pod_names; do
@@ -246,6 +344,42 @@ monitor_pod_health() {
                 restarts=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")
                 echo -e "${CYAN}$pod${NC}\t$(format_status "$phase")\t$(format_status "$ready")\t$(format_number "$restarts" "restarts")\t${YELLOW}$APP_NAME${NC}"
             done
+        # Try with specific component labels for known apps
+        elif [[ "$APP_NAME" == "mlflow" ]]; then
+            pod_names=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=server -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
+            if [ -n "$pod_names" ]; then
+                found_any=true
+                for pod in $pod_names; do
+                    local phase ready restarts
+                    phase=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                    ready=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+                    restarts=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")
+                    echo -e "${CYAN}$pod${NC}\t$(format_status "$phase")\t$(format_status "$ready")\t$(format_number "$restarts" "restarts")\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        elif [[ "$APP_NAME" == "mlflow-webhook" ]]; then
+            pod_names=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=webhook-handler -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
+            if [ -n "$pod_names" ]; then
+                found_any=true
+                for pod in $pod_names; do
+                    local phase ready restarts
+                    phase=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                    ready=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+                    restarts=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")
+                    echo -e "${CYAN}$pod${NC}\t$(format_status "$phase")\t$(format_status "$ready")\t$(format_number "$restarts" "restarts")\t${YELLOW}$APP_NAME${NC}"
+                done
+            fi
+        # Try with app.kubernetes.io/name label
+        elif pod_names=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null) && [ -n "$pod_names" ]; then
+            found_any=true
+            for pod in $pod_names; do
+                local phase ready restarts
+                phase=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                ready=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+                restarts=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")
+                echo -e "${CYAN}$pod${NC}\t$(format_status "$phase")\t$(format_status "$ready")\t$(format_number "$restarts" "restarts")\t${YELLOW}$APP_NAME${NC}"
+            done
+        # Fallback to name matching
         else
             pod_names=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]" | awk '{print $1}' || echo "")
             if [ -n "$pod_names" ]; then
@@ -299,6 +433,7 @@ monitor_pod_logs() {
     
     for APP_NAME in "${APP_NAMES[@]}"; do
         local pod_names
+        # Try with app label first
         if pod_names=$(kubectl get pods -n "$NAMESPACE" -l app="$APP_NAME" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null) && [ -n "$pod_names" ]; then
             found_any=true
             for pod in $pod_names; do
@@ -313,6 +448,57 @@ monitor_pod_logs() {
                     echo -e "${WHITE}$logs${NC}"
                 fi
             done
+        # Try with specific component labels for known apps
+        elif [[ "$APP_NAME" == "mlflow" ]]; then
+            pod_names=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=server -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
+            if [ -n "$pod_names" ]; then
+                found_any=true
+                for pod in $pod_names; do
+                    echo
+                    echo -e "${PURPLE}🔍 Logs for pod: ${BOLD}$pod${NC} ${YELLOW}(app: $APP_NAME)${NC}"
+                    echo -e "${YELLOW}$(printf '%.60s' "$(yes '─' | head -60 | tr -d '\n')")${NC}"
+                    local logs
+                    logs=$(kubectl logs "$pod" -n "$NAMESPACE" --tail=10 2>/dev/null || echo "Unable to fetch logs")
+                    if [[ "$logs" == "Unable to fetch logs" ]]; then
+                        echo -e "${RED}❌ Unable to fetch logs for pod: $pod${NC}"
+                    else
+                        echo -e "${WHITE}$logs${NC}"
+                    fi
+                done
+            fi
+        elif [[ "$APP_NAME" == "mlflow-webhook" ]]; then
+            pod_names=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlflow,app.kubernetes.io/component=webhook-handler -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
+            if [ -n "$pod_names" ]; then
+                found_any=true
+                for pod in $pod_names; do
+                    echo
+                    echo -e "${PURPLE}🔍 Logs for pod: ${BOLD}$pod${NC} ${YELLOW}(app: $APP_NAME)${NC}"
+                    echo -e "${YELLOW}$(printf '%.60s' "$(yes '─' | head -60 | tr -d '\n')")${NC}"
+                    local logs
+                    logs=$(kubectl logs "$pod" -n "$NAMESPACE" --tail=10 2>/dev/null || echo "Unable to fetch logs")
+                    if [[ "$logs" == "Unable to fetch logs" ]]; then
+                        echo -e "${RED}❌ Unable to fetch logs for pod: $pod${NC}"
+                    else
+                        echo -e "${WHITE}$logs${NC}"
+                    fi
+                done
+            fi
+        # Try with app.kubernetes.io/name label
+        elif pod_names=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name="$APP_NAME" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null) && [ -n "$pod_names" ]; then
+            found_any=true
+            for pod in $pod_names; do
+                echo
+                echo -e "${PURPLE}🔍 Logs for pod: ${BOLD}$pod${NC} ${YELLOW}(app: $APP_NAME)${NC}"
+                echo -e "${YELLOW}$(printf '%.60s' "$(yes '─' | head -60 | tr -d '\n')")${NC}"
+                local logs
+                logs=$(kubectl logs "$pod" -n "$NAMESPACE" --tail=10 2>/dev/null || echo "Unable to fetch logs")
+                if [[ "$logs" == "Unable to fetch logs" ]]; then
+                    echo -e "${RED}❌ Unable to fetch logs for pod: $pod${NC}"
+                else
+                    echo -e "${WHITE}$logs${NC}"
+                fi
+            done
+        # Fallback to name matching
         else
             pod_names=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep "^$APP_NAME-" | grep -v "^$APP_NAME-[a-z]" | awk '{print $1}' || echo "")
             if [ -n "$pod_names" ]; then
