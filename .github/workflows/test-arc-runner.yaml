@@ -1,0 +1,115 @@
+name: Test ARC Runner
+
+on:
+  workflow_dispatch:  # Manual trigger from GitHub Actions UI
+  push:
+    branches:
+      - test-runner  # Also trigger on push to test-runner branch
+
+jobs:
+  test-runner:
+    runs-on: [ml-platform-nonprod]  # Target the ARC runner scale set
+
+    steps:
+      - name: Runner Environment Info
+        run: |
+          echo "================================"
+          echo "Runner Information"
+          echo "================================"
+          echo "Runner Name: $RUNNER_NAME"
+          echo "Runner OS: $RUNNER_OS"
+          echo "Runner Arch: $RUNNER_ARCH"
+          echo "Runner Temp: $RUNNER_TEMP"
+          echo "Runner Tool Cache: $RUNNER_TOOL_CACHE"
+          echo ""
+          echo "================================"
+          echo "System Information"
+          echo "================================"
+          uname -a
+          cat /etc/os-release
+          echo ""
+          echo "CPU Info:"
+          lscpu | grep -E "Model name|CPU\(s\)|Thread|Core"
+          echo ""
+          echo "Memory Info:"
+          free -h
+
+      - name: Check Docker
+        run: |
+          echo "================================"
+          echo "Docker Information"
+          echo "================================"
+          docker --version
+          docker info | grep -E "Server Version|Storage Driver|Operating System|CPUs|Total Memory"
+          echo ""
+          echo "Docker Containers:"
+          docker ps -a
+          echo ""
+          echo "Docker Images:"
+          docker images
+
+      - name: Test Docker Build
+        run: |
+          echo "================================"
+          echo "Testing Docker Build Capability"
+          echo "================================"
+          docker run --rm hello-world
+          echo ""
+          echo "✅ Docker build capability verified"
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Test File Operations
+        run: |
+          echo "================================"
+          echo "Testing File Operations"
+          echo "================================"
+          echo "Current Directory:"
+          pwd
+          echo ""
+          echo "Workspace contents:"
+          ls -la
+          echo ""
+          echo "Disk Usage:"
+          df -h
+          echo ""
+          echo "Creating test files..."
+          mkdir -p test-dir
+          echo "Test content" > test-dir/test-file.txt
+          cat test-dir/test-file.txt
+          echo "✅ File operations working"
+
+      - name: Test Network
+        run: |
+          echo "================================"
+          echo "Testing Network Connectivity"
+          echo "================================"
+          echo "Testing DNS..."
+          nslookup github.com
+          echo ""
+          echo "Testing HTTPS connectivity..."
+          curl -I https://github.com
+          echo "✅ Network connectivity verified"
+
+      - name: Test Python
+        run: |
+          echo "================================"
+          echo "Testing Python"
+          echo "================================"
+          python3 --version || echo "Python not available"
+          pip3 --version || echo "Pip not available"
+
+      - name: Summary
+        run: |
+          echo "================================"
+          echo "🎉 Test Summary"
+          echo "================================"
+          echo "✅ Runner environment: OK"
+          echo "✅ Docker: OK"
+          echo "✅ Docker build: OK"
+          echo "✅ Checkout: OK"
+          echo "✅ File operations: OK"
+          echo "✅ Network: OK"
+          echo ""
+          echo "🚀 GitHub Actions Runner Controller is working perfectly!"
