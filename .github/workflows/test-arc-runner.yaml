@@ -8,7 +8,8 @@ on:
 
 jobs:
   test-runner:
-    runs-on: [ml-platform-nonprod]  # Target the ARC runner scale set
+    name: ML Platform Nonprod Runner
+    runs-on: ml-platform-nonprod  # Target the ARC runner scale set
 
     steps:
       - name: Runner Environment Info
